@@ -1,0 +1,111 @@
+---
+title: "Practical Machine Learning"
+author: "Michal Dzwolak"
+date: "November 4, 2017"
+output: html_document
+---
+###Project's goal:
+
+Goal of a project is to predict the manner in which particular training person did the exercise. Training's evaluation based on "classe" (factor variable) column.  
+
+###Data import
+```{r dataprep}
+upload <- read.csv("pml-training.csv",na.strings = c("", "NA", "#DIV/0!"))
+test <- read.csv("pml-testing.csv",na.strings = c("", "NA", "#DIV/0!"))
+```
+
+###Data cleaning
+
+Imported data set contains 19622 rows and 160 columns. Siginificant number of columns contains "NA" values. Missing data would influence on a data analysis in a significant way. 
+
+To increase accuracy of analysis I did some cealnieng:
+
+1. Do not take under consideration columns which conatins +80% of rows with "NA" values.
+2. Do not take under consideration columns which conatins +80% of rows with "blank" values.
+3. Do not take under consideration columns which conatins data like: index, name etc. (columns from 1 to 6)
+
+```{r cleaning, echo=TRUE}
+okcolumns = apply(upload, 2, function(x) sum(is.na(x))<dim(upload)[1]*0.8)
+
+upload = upload[,okcolumns]
+
+okcolumns2 = apply(upload,2, function(x) sum(x=="")<dim(upload)[1]*0.8)
+
+upload = upload[,okcolumns2]
+
+upload = upload[,-c(1:6)]
+```
+
+After data manipulation columns number decreased from 160 to 54.
+
+###Spliting dataset 
+Dataset split: 
+
+1. "builddata" dataset (70%) split in to "training" (70%) and testing dataset (30%).
+2. "validation" dataset (30%) datasets. 
+
+```{r spli, echo=TRUE, message=FALSE, warning=FALSE}
+library(caret)
+inTrain = createDataPartition(y=upload$classe, p=0.7, list = FALSE)
+
+validation = upload[-inTrain,]
+
+builddata = upload[inTrain,]
+
+inTrain2 = createDataPartition(y=builddata$classe , p=0.7, list = FALSE)
+
+training = upload[-inTrain2,]
+testing = upload[inTrain2,]
+
+```
+
+Training dataset contains `r dim(training)[1]` of rows, validation dataset `r dim(validation)[1]` number of rows and testing dataset `r dim(testing)[1]` number of rows.
+
+###Classification model
+
+To classify each training i will use Random Forest model. If model will not perform well I will move to a different classification model. 
+
+If Random Forest model will perform good, this analysis will end.
+
+```{r random, echo=TRUE, message=FALSE, warning=FALSE, cache=TRUE}
+library(randomForest)
+
+predictor = randomForest(classe~., data = training, importance=TRUE) 
+
+pred1 = predict(predictor, training)
+
+#model validation
+
+conmat1 = confusionMatrix(pred1, training$classe)
+print(conmat1)
+```
+
+As it can be observed Random Forest model works very good. Next, I will test model on testing dataset. 
+```{r random1, echo=TRUE, message=FALSE, warning=FALSE, cache=TRUE}
+pred2 = predict(predictor, testing)
+
+#model validation
+
+conmat2 = confusionMatrix(pred2, testing$classe)
+print(conmat2)
+```
+Also model perform well on a testing dataset. 
+
+Final test of a model on a validation dataset.
+```{r random3, echo=TRUE, message=FALSE, warning=FALSE, cache=TRUE}
+pred3 = predict(predictor, validation)
+
+#model validation
+
+conmat3 = confusionMatrix(pred3, validation$classe)
+print(conmat3)
+
+```
+
+###Conclusions:
+
+Random forest model performed very good on analysed dataset. Model achieves 0.9995 of an accuracy on validation dataset and 0.9993 accuracy on a testing dataset. 
+
+Out of sample error (testing dataset) is: `r 1 - sum(pred2 == testing$classe)/length(pred2)`
+
+Out of sample error (validation dataset) is: `r 1 - sum(pred3 == validation$classe)/length(pred3)` 
